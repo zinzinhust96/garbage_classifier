@@ -1,6 +1,6 @@
 - write evaluate script (DONE)
 - write inference script (DONE)
-- write into a python script
+- write train code into a python script (DONE)
 - add code to save 5 best ckpts
 - add MLflow tracking
 - hyper-tuning (lr, ...)
