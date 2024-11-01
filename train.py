@@ -17,7 +17,7 @@ DATA_DIR = 'data_split'
 BATCH_SIZE = 128
 IMAGE_SIZE = 394
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 100
+NUM_EPOCHS = 20
 
 ### Data transforms
 data_transforms = {
@@ -147,7 +147,7 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
                 torch.save(model.state_dict(), ckpt_path)
 
                 # Keep only the best k checkpoints
-                keep_k_best_checkpoints(model_path, 5)
+                keep_k_best_checkpoints(model_path, 3)
 
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
