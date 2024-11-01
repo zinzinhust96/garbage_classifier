@@ -1,6 +1,5 @@
 import os
 import time
-import shutil
 
 import torch
 import torch.nn as nn
@@ -88,7 +87,7 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
         if len(old_checkpoints) > checkpoint_save_total_limit:
             old_checkpoints = sorted(old_checkpoints, key=lambda x: x['score'])
             print(f"Deleting old checkpoints: {old_checkpoints[0]['path']}")
-            shutil.rmtree(old_checkpoints[0]['path'])
+            os.remove(old_checkpoints[0]['path'])
 
 
 def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=25):
