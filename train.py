@@ -1,23 +1,36 @@
 import os
 import time
 
+import mlflow
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import torchvision
 from torchvision import datasets, transforms
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ###
-EXPERIMENT_NAME = 'garbage_classifier'
+EXPERIMENT_NAME = "GC"
 MODEL_DIR = 'models/'
 DATA_DIR = 'data_split'
+RUN_NAME = 'hyperparam_tuning'
+os.makedirs(os.path.join(MODEL_DIR, RUN_NAME), exist_ok=True)
+
 
 ### hyperparameters
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 IMAGE_SIZE = 394
 LEARNING_RATE = 0.001
 NUM_EPOCHS = 20
+NUM_IMMEDIATE_FEATURES = 128
+DROPOUT_RATE = 0.2
+
+# init mlflow
+mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI'))
+mlflow.set_experiment(EXPERIMENT_NAME)
 
 ### Data transforms
 data_transforms = {
@@ -57,11 +70,11 @@ for param in model_conv.parameters():
 
 num_ftrs = model_conv.classifier[1].in_features
 model_conv.classifier = nn.Sequential(
-    nn.Dropout(0.2),
-    nn.Linear(num_ftrs, 128),
+    nn.Dropout(DROPOUT_RATE),
+    nn.Linear(num_ftrs, NUM_IMMEDIATE_FEATURES),
     nn.ReLU(),
-    nn.Dropout(0.2),
-    nn.Linear(128, len(class_names))
+    nn.Dropout(DROPOUT_RATE),
+    nn.Linear(NUM_IMMEDIATE_FEATURES, len(class_names))
 )
 model_conv = model_conv.to(device)
 
@@ -91,7 +104,18 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
 
 
 def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=25):
-    os.makedirs(model_path, exist_ok=True)
+    mlflow.start_run(run_name=RUN_NAME)
+
+    # log hyperparameters
+    hyperparameters = {
+        'batch_size': BATCH_SIZE,
+        'image_size': IMAGE_SIZE,
+        'learning_rate': LEARNING_RATE,
+        'num_epochs': NUM_EPOCHS,
+        'num_immediate_features': NUM_IMMEDIATE_FEATURES,
+        'dropout_rate': DROPOUT_RATE
+    }
+    mlflow.log_params(hyperparameters)
 
     for epoch in range(num_epochs):
         since = time.time()
@@ -139,6 +163,8 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
             print(f'{phase} Epoch {epoch}/{num_epochs - 1}. Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+            mlflow.log_metric(f'{phase}_loss', epoch_loss, step=epoch)
+            mlflow.log_metric(f'{phase}_acc', epoch_acc, step=epoch)
 
             # deep copy the model
             if phase == 'val':
@@ -152,6 +178,5 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 
-RUN_NAME = 'init'
 model_conv = train_model(model_conv, criterion, optimizer_conv, exp_lr_scheduler,
                          model_path=os.path.join(MODEL_DIR, RUN_NAME), num_epochs=NUM_EPOCHS)

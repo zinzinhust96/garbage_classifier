@@ -6,3 +6,5 @@ seaborn
 split-folders
 pillow
 tqdm
+python-dotenv
+mlflow
