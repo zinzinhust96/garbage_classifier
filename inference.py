@@ -6,8 +6,9 @@ import torch.nn as nn
 import torchvision
 from PIL import Image
 from torchvision import transforms
+from tqdm import tqdm
 
-MODEL_PATH = "/home/namdng/garbage_classfier/models/init/ckpt_10_0.9331.pth"
+MODEL_PATH = "/home/namdng/garbage_classfier/models/init/ckpt_26_0.9547.pth"
 IMAGE_SIZE = 394
 BENCHMARK = True
 
@@ -55,14 +56,18 @@ def visualize_model_predictions(model,img_path):
     return class_names[preds[0]], time.time() - since
 
 
-TEST_DIR = 'data_split/test/others'
-test_images_name = [item for item in os.listdir(TEST_DIR) if item.endswith('.jpg')]
-print(f"Total test images: {len(test_images_name)}")
+TEST_DIR = 'data_split/test'
+test_images_paths = []
+for class_name in os.listdir(TEST_DIR):
+    class_dir = os.path.join(TEST_DIR, class_name)
+    for img_name in os.listdir(class_dir):
+        img_path = os.path.join(class_dir, img_name)
+        test_images_paths.append(img_path)
+print(f"Total test images: {len(test_images_paths)}")
 
 if BENCHMARK:
     time_array = []
-    for img_name in test_images_name:
-        img_path = os.path.join(TEST_DIR, img_name)
+    for img_path in tqdm(test_images_paths):
         pred, time_elapsed = visualize_model_predictions(model_conv, img_path)
         time_array.append(time_elapsed)
 
@@ -73,3 +78,4 @@ else:
     print(f"Predicted class: {pred}")
     print(f"Inference time: {time_elapsed}")
 
+# Latency for GPU: 0.014438848256210272
