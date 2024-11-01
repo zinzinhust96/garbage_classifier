@@ -93,7 +93,6 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
 
 def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=25):
     os.makedirs(model_path, exist_ok=True)
-    best_acc = 0.0
 
     for epoch in range(num_epochs):
         since = time.time()
@@ -143,8 +142,7 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
             print(f'{phase} Epoch {epoch}/{num_epochs - 1}. Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
             # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
+            if phase == 'val':
                 ckpt_path = os.path.join(model_path, f"ckpt_{epoch}_{epoch_acc:.4f}.pth")
                 print(f'Saving best model to {ckpt_path}')
                 torch.save(model.state_dict(), ckpt_path)
@@ -154,7 +152,6 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
 
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
-        print(f'Current best val Acc: {best_acc:4f}')
 
 RUN_NAME = 'init'
 model_conv = train_model(model_conv, criterion, optimizer_conv, exp_lr_scheduler,
