@@ -90,15 +90,15 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
         old_checkpoints = []
         for subdir in os.listdir(model_dir):
             if subdir.endswith(".pth"):
-                subdir_step, subdir_score = subdir.replace(".pth", "").split("_")[1:]
+                subdir_step, subdir_loss = subdir.replace(".pth", "").split("_")[1:]
                 old_checkpoints.append({
                     'step': int(subdir_step),
-                    'score': float(subdir_score),
+                    'loss': float(subdir_loss),
                     'path': os.path.join(model_dir, subdir),
                 })
 
         if len(old_checkpoints) > checkpoint_save_total_limit:
-            old_checkpoints = sorted(old_checkpoints, key=lambda x: x['score'])
+            old_checkpoints = sorted(old_checkpoints, key=lambda x: x['loss'], reverse=True)
             print(f"Deleting old checkpoints: {old_checkpoints[0]['path']}")
             os.remove(old_checkpoints[0]['path'])
 
@@ -168,7 +168,7 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
 
             # deep copy the model
             if phase == 'val':
-                ckpt_path = os.path.join(model_path, f"ckpt_{epoch}_{epoch_acc:.4f}.pth")
+                ckpt_path = os.path.join(model_path, f"ckpt_{epoch}_{epoch_loss:.4f}.pth")
                 print(f'Saving best model to {ckpt_path}')
                 torch.save(model.state_dict(), ckpt_path)
 
