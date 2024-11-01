@@ -1,17 +1,11 @@
+import os
+import time
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.optim import lr_scheduler
-import torch.backends.cudnn as cudnn
-import numpy as np
-from tqdm import tqdm
 import torchvision
-from torchvision import datasets, models, transforms
-import matplotlib.pyplot as plt
-import time
-import os
-from PIL import Image
-from tempfile import TemporaryDirectory
+from torchvision import datasets, transforms
+from tqdm import tqdm
 
 MODEL_PATH = "/home/namdng/garbage_classfier/models/init/ckpt_10_0.9331.pth"
 DATA_DIR = 'data_split'
