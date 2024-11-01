@@ -1,5 +1,6 @@
 import os
 import time
+import shutil
 
 import torch
 import torch.nn as nn
@@ -17,7 +18,7 @@ DATA_DIR = 'data_split'
 BATCH_SIZE = 128
 IMAGE_SIZE = 394
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 10
+NUM_EPOCHS = 100
 
 ### Data transforms
 data_transforms = {
@@ -70,6 +71,26 @@ criterion = nn.CrossEntropyLoss()
 optimizer_conv = optim.Adam(model_conv.parameters(), lr=LEARNING_RATE)
 exp_lr_scheduler = None
 
+
+def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
+    # Delete old checkpoints
+    if checkpoint_save_total_limit is not None and checkpoint_save_total_limit > 0:
+        old_checkpoints = []
+        for subdir in os.listdir(model_dir):
+            if subdir.endswith(".pth"):
+                subdir_step, subdir_score = subdir.replace(".pth", "").split("_")[1:]
+                old_checkpoints.append({
+                    'step': int(subdir_step),
+                    'score': float(subdir_score),
+                    'path': os.path.join(model_dir, subdir),
+                })
+
+        if len(old_checkpoints) > checkpoint_save_total_limit:
+            old_checkpoints = sorted(old_checkpoints, key=lambda x: x['score'])
+            print(f"Deleting old checkpoints: {old_checkpoints[0]['path']}")
+            shutil.rmtree(old_checkpoints[0]['path'])
+
+
 def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=25):
     os.makedirs(model_path, exist_ok=True)
     best_acc = 0.0
@@ -119,13 +140,17 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
-            print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+            print(f'{phase} Epoch {epoch}/{num_epochs - 1}. Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 ckpt_path = os.path.join(model_path, f"ckpt_{epoch}_{epoch_acc:.4f}.pth")
+                print(f'Saving best model to {ckpt_path}')
                 torch.save(model.state_dict(), ckpt_path)
+
+                # Keep only the best k checkpoints
+                keep_k_best_checkpoints(model_path, 5)
 
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
@@ -133,4 +158,4 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
 
 RUN_NAME = 'init'
 model_conv = train_model(model_conv, criterion, optimizer_conv, exp_lr_scheduler,
-                         model_path=os.path.join(MODEL_DIR, EXPERIMENT_NAME), num_epochs=NUM_EPOCHS)
+                         model_path=os.path.join(MODEL_DIR, RUN_NAME), num_epochs=NUM_EPOCHS)
