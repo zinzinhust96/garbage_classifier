@@ -23,7 +23,7 @@ IMAGE_SIZE = 394
 ### Device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-### Data loaders
+### Data transforms
 data_transforms = {
     x: transforms.Compose([
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
@@ -32,6 +32,7 @@ data_transforms = {
     ]) for x in DATA_SPLITS
 }
 
+### Data loaders
 image_datasets = {x: datasets.ImageFolder(os.path.join(DATA_DIR, x), data_transforms[x])
                   for x in DATA_SPLITS}
 
