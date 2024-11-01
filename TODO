@@ -1,5 +1,5 @@
 - write evaluate script (DONE)
-- write inference script
+- write inference script (DONE)
 - write into a python script
 - add code to save 5 best ckpts
 - add MLflow tracking
