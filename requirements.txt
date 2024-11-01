@@ -1,0 +1,6 @@
+pandas
+matplotlib
+seaborn
+split-folders
+pillow
+tqdm
