@@ -8,3 +8,5 @@ pillow
 tqdm
 python-dotenv
 mlflow
+onnx
+onnxruntime
