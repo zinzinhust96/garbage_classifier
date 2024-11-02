@@ -3,5 +3,5 @@
 - write train code into a python script (DONE)
 - add code to save 5 best ckpts (DONE)
 - add MLflow tracking (DONE)
-- hyper-tuning (lr [1e-3, 3e-4, 1e-4], batch_size [32, 64, 128])
+- hyper-tuning (lr [1e-3, 3e-4, 1e-4], batch_size [32, 64, 128]) (DONE)
 - optimized model speed

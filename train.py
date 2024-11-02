@@ -16,19 +16,14 @@ load_dotenv()
 EXPERIMENT_NAME = "GC"
 MODEL_DIR = 'models/'
 DATA_DIR = 'data_split'
-RUN_NAME = 'hyperparam_tuning'
-os.makedirs(os.path.join(MODEL_DIR, RUN_NAME), exist_ok=True)
-
 
 ### hyperparameters
-BATCH_SIZE = 32
 IMAGE_SIZE = 394
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 20
+NUM_EPOCHS = 100
 NUM_IMMEDIATE_FEATURES = 128
 DROPOUT_RATE = 0.2
 
-# init mlflow
+### init mlflow tracking
 mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI'))
 mlflow.set_experiment(EXPERIMENT_NAME)
 
@@ -49,39 +44,14 @@ data_transforms = {
     ]),
 }
 
-### Data loaders
+### Datasets
 image_datasets = {x: datasets.ImageFolder(os.path.join(DATA_DIR, x),
                                           data_transforms[x])
                   for x in ['train', 'val']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=BATCH_SIZE,
-                                             shuffle=True, num_workers=8)
-              for x in ['train', 'val']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-### Init models
-model_conv = torchvision.models.efficientnet_v2_s(weights='IMAGENET1K_V1')
-
-# freeze all layers
-for param in model_conv.parameters():
-    param.requires_grad = False
-
-num_ftrs = model_conv.classifier[1].in_features
-model_conv.classifier = nn.Sequential(
-    nn.Dropout(DROPOUT_RATE),
-    nn.Linear(num_ftrs, NUM_IMMEDIATE_FEATURES),
-    nn.ReLU(),
-    nn.Dropout(DROPOUT_RATE),
-    nn.Linear(NUM_IMMEDIATE_FEATURES, len(class_names))
-)
-model_conv = model_conv.to(device)
-
-### Loss and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer_conv = optim.Adam(model_conv.parameters(), lr=LEARNING_RATE)
-exp_lr_scheduler = None
 
 
 def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
@@ -103,20 +73,7 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
             os.remove(old_checkpoints[0]['path'])
 
 
-def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=25):
-    mlflow.start_run(run_name=RUN_NAME)
-
-    # log hyperparameters
-    hyperparameters = {
-        'batch_size': BATCH_SIZE,
-        'image_size': IMAGE_SIZE,
-        'learning_rate': LEARNING_RATE,
-        'num_epochs': NUM_EPOCHS,
-        'num_immediate_features': NUM_IMMEDIATE_FEATURES,
-        'dropout_rate': DROPOUT_RATE
-    }
-    mlflow.log_params(hyperparameters)
-
+def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path, num_epochs=25):
     for epoch in range(num_epochs):
         since = time.time()
         print(f'Epoch {epoch}/{num_epochs - 1}')
@@ -178,7 +135,74 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 
+
+def run_an_experiment(learning_rate, batch_size, run_name):
+    os.makedirs(os.path.join(MODEL_DIR, run_name), exist_ok=True)
+    print(f"\n\n ++++++++++ Training with exp name: {run_name}")
+
+    ### mlflow
+    mlflow.start_run(run_name=run_name)
+
+    ### log hyperparameters
+    hyperparameters = {
+        'batch_size': batch_size,
+        'image_size': IMAGE_SIZE,
+        'learning_rate': learning_rate,
+        'num_epochs': NUM_EPOCHS,
+        'num_immediate_features': NUM_IMMEDIATE_FEATURES,
+        'dropout_rate': DROPOUT_RATE
+    }
+    mlflow.log_params(hyperparameters)
+
+    ### Dataloader for the current batch size
+    dataloaders = {
+        x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
+                                        shuffle=True, num_workers=8)
+        for x in ['train', 'val']
+    }
+
+    ### Init models
+    model_conv = torchvision.models.efficientnet_v2_s(weights='IMAGENET1K_V1')
+
+    # freeze all layers
+    for param in model_conv.parameters():
+        param.requires_grad = False
+
+    num_ftrs = model_conv.classifier[1].in_features
+    model_conv.classifier = nn.Sequential(
+        nn.Dropout(DROPOUT_RATE),
+        nn.Linear(num_ftrs, NUM_IMMEDIATE_FEATURES),
+        nn.ReLU(),
+        nn.Dropout(DROPOUT_RATE),
+        nn.Linear(NUM_IMMEDIATE_FEATURES, len(class_names))
+    )
+    model_conv = model_conv.to(device)
+
+    ### Loss and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer_conv = optim.Adam(model_conv.parameters(), lr=learning_rate)
+    exp_lr_scheduler = None
+
+    ### Train
+    model_conv = train_model(model_conv, dataloaders, criterion, optimizer_conv, exp_lr_scheduler,
+                            model_path=os.path.join(MODEL_DIR, run_name), num_epochs=NUM_EPOCHS)
+
+    ### end mlflow
     mlflow.end_run()
 
-model_conv = train_model(model_conv, criterion, optimizer_conv, exp_lr_scheduler,
-                         model_path=os.path.join(MODEL_DIR, RUN_NAME), num_epochs=NUM_EPOCHS)
+
+### Hyperparameter tuning
+# learning_rates = [1e-3, 3e-4, 1e-4]
+# batch_sizes = [32, 64, 128]
+
+# for lr in learning_rates:
+#     for bs in batch_sizes:
+#         run_name = f"param_tuning_lr_{lr}_bs_{bs}"
+#         run_an_experiment(lr, bs, run_name)
+
+### Normal run
+LEARNING_RATE = 1e-3
+BATCH_SIZE = 64
+RUN_NAME = "param_tuned"
+run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
+        
