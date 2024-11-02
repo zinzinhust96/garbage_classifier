@@ -178,5 +178,7 @@ def train_model(model, criterion, optimizer, scheduler, model_path, num_epochs=2
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
 
+    mlflow.end_run()
+
 model_conv = train_model(model_conv, criterion, optimizer_conv, exp_lr_scheduler,
                          model_path=os.path.join(MODEL_DIR, RUN_NAME), num_epochs=NUM_EPOCHS)
