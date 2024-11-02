@@ -1,16 +1,24 @@
 import os
 import time
+import random
 
 import mlflow
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 from tqdm import tqdm
 import torchvision
 from torchvision import datasets, transforms
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Setting seed for all random initializations
+SEED = 2
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 ###
 EXPERIMENT_NAME = "GC"
