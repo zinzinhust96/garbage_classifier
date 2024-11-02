@@ -80,8 +80,11 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
             print(f"Deleting old checkpoints: {old_checkpoints[0]['path']}")
             os.remove(old_checkpoints[0]['path'])
 
+    # return best checkpoint (epoch, loss)
+    return old_checkpoints[-1]['step'], old_checkpoints[-1]['loss']
 
-def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path, num_epochs=25):
+
+def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path, num_epochs=25, early_stopping=10):
     for epoch in range(num_epochs):
         since = time.time()
         print(f'Epoch {epoch}/{num_epochs - 1}')
@@ -138,10 +141,16 @@ def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path,
                 torch.save(model.state_dict(), ckpt_path)
 
                 # Keep only the best k checkpoints
-                keep_k_best_checkpoints(model_path, 3)
+                best_ckpt_epoch, best_ckpt_loss = keep_k_best_checkpoints(model_path, 3)
+
+                # Early stopping
+                if early_stopping is not None and epoch - best_ckpt_epoch > early_stopping:
+                    print(f'Early stopping at epoch {epoch}')
+                    return model
 
         time_elapsed = time.time() - since
         print(f'Epoch complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
+    return model
 
 
 def run_an_experiment(learning_rate, batch_size, run_name):
@@ -193,7 +202,8 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 
     ### Train
     model_conv = train_model(model_conv, dataloaders, criterion, optimizer_conv, exp_lr_scheduler,
-                            model_path=os.path.join(MODEL_DIR, run_name), num_epochs=NUM_EPOCHS)
+                            model_path=os.path.join(MODEL_DIR, run_name), 
+                            num_epochs=NUM_EPOCHS, early_stopping=10)
 
     ### end mlflow
     mlflow.end_run()
