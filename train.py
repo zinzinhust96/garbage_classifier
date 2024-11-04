@@ -123,16 +123,21 @@ def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path,
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
-            if phase == 'train':
-                if scheduler:
-                    scheduler.step()
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
-            print(f'{phase} Epoch {epoch}/{num_epochs - 1}. Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+            current_lr = scheduler.get_last_lr()[0] if scheduler else optimizer.param_groups[0]['lr']
+            print(f'{phase} Epoch {epoch}/{num_epochs - 1}. Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} LR: {current_lr}')
             mlflow.log_metric(f'{phase}_loss', epoch_loss, step=epoch)
             mlflow.log_metric(f'{phase}_acc', epoch_acc, step=epoch)
+            if phase == 'train':
+                mlflow.log_metric(f'running_lr', current_lr, step=epoch)
+
+            if phase == 'val' and scheduler:
+                print(f'[SCHEDULER] step with loss: {epoch_loss:.4f}. Best loss {scheduler.best}. Is better: {scheduler.is_better(epoch_loss, scheduler.best)}')
+                scheduler.step(epoch_loss)
+                print(f'[SCHEDULER] Num bad epochs: {scheduler.num_bad_epochs}')
 
             # deep copy the model
             if phase == 'val':
@@ -198,7 +203,8 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     ### Loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer_conv = optim.Adam(model_conv.parameters(), lr=learning_rate)
-    exp_lr_scheduler = None
+    exp_lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_conv, mode='min', factor=0.2, patience=6)
+    # exp_lr_scheduler = None
     early_stopper = EarlyStopper(patience=10)
 
     ### Train
@@ -222,6 +228,5 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 ### Normal run
 LEARNING_RATE = 1e-3
 BATCH_SIZE = 64
-RUN_NAME = "param_tuned_lr_1e-3_bs_64"
+RUN_NAME = "lr_1e-3_bs_64_sche-f0.2-p6"
 run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
-        
