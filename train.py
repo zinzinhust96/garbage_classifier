@@ -68,20 +68,20 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
         old_checkpoints = []
         for subdir in os.listdir(model_dir):
             if subdir.endswith(".pth"):
-                subdir_step, subdir_loss = subdir.replace(".pth", "").split("_")[1:]
+                subdir_step, subdir_score = subdir.replace(".pth", "").split("_")[1:]
                 old_checkpoints.append({
                     'step': int(subdir_step),
-                    'loss': float(subdir_loss),
+                    'score': float(subdir_score),
                     'path': os.path.join(model_dir, subdir),
                 })
 
         if len(old_checkpoints) > checkpoint_save_total_limit:
-            old_checkpoints = sorted(old_checkpoints, key=lambda x: x['loss'], reverse=True)
+            old_checkpoints = sorted(old_checkpoints, key=lambda x: x['score'])
             print(f"Deleting old checkpoints: {old_checkpoints[0]['path']}")
             os.remove(old_checkpoints[0]['path'])
 
     # return best checkpoint (epoch, loss)
-    return old_checkpoints[-1]['step'], old_checkpoints[-1]['loss']
+    return old_checkpoints[-1]['step'], old_checkpoints[-1]['score']
 
 
 def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path, num_epochs=25, early_stopping=10):
@@ -136,12 +136,12 @@ def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path,
 
             # deep copy the model
             if phase == 'val':
-                ckpt_path = os.path.join(model_path, f"ckpt_{epoch}_{epoch_loss:.4f}.pth")
+                ckpt_path = os.path.join(model_path, f"ckpt_{epoch}_{epoch_acc:.4f}.pth")
                 print(f'Saving best model to {ckpt_path}')
                 torch.save(model.state_dict(), ckpt_path)
 
                 # Keep only the best k checkpoints
-                best_ckpt_epoch, best_ckpt_loss = keep_k_best_checkpoints(model_path, 3)
+                best_ckpt_epoch, best_ckpt_score = keep_k_best_checkpoints(model_path, 3)
 
                 # Early stopping
                 if early_stopping is not None and epoch - best_ckpt_epoch > early_stopping:
@@ -221,6 +221,6 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 ### Normal run
 LEARNING_RATE = 1e-3
 BATCH_SIZE = 64
-RUN_NAME = "param_tuned"
+RUN_NAME = "param_tuned_lr_1e-3_bs_64"
 run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
         
