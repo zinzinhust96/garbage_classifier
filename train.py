@@ -12,6 +12,8 @@ import torchvision
 from torchvision import datasets, transforms
 from dotenv import load_dotenv
 
+from early_stop import EarlyStopper
+
 load_dotenv()
 
 # Setting seed for all random initializations
@@ -62,7 +64,7 @@ class_names = image_datasets['train'].classes
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
+def keep_k_best_checkpoints_by_score(model_dir, checkpoint_save_total_limit):
     # Delete old checkpoints
     if checkpoint_save_total_limit is not None and checkpoint_save_total_limit > 0:
         old_checkpoints = []
@@ -75,16 +77,14 @@ def keep_k_best_checkpoints(model_dir, checkpoint_save_total_limit):
                     'path': os.path.join(model_dir, subdir),
                 })
 
+        # remove old checkpoints based on score
         if len(old_checkpoints) > checkpoint_save_total_limit:
             old_checkpoints = sorted(old_checkpoints, key=lambda x: x['score'])
             print(f"Deleting old checkpoints: {old_checkpoints[0]['path']}")
             os.remove(old_checkpoints[0]['path'])
 
-    # return best checkpoint (epoch, loss)
-    return old_checkpoints[-1]['step'], old_checkpoints[-1]['score']
 
-
-def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path, num_epochs=25, early_stopping=10):
+def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path, num_epochs=25, early_stopper=None):
     for epoch in range(num_epochs):
         since = time.time()
         print(f'Epoch {epoch}/{num_epochs - 1}')
@@ -140,11 +140,11 @@ def train_model(model, dataloaders, criterion, optimizer, scheduler, model_path,
                 print(f'Saving best model to {ckpt_path}')
                 torch.save(model.state_dict(), ckpt_path)
 
-                # Keep only the best k checkpoints
-                best_ckpt_epoch, best_ckpt_score = keep_k_best_checkpoints(model_path, 3)
+                # Keep only the best k checkpoints based on validation score
+                keep_k_best_checkpoints_by_score(model_path, 3)
 
-                # Early stopping
-                if early_stopping is not None and epoch - best_ckpt_epoch > early_stopping:
+                # early stopping based on validation loss
+                if early_stopper and early_stopper.early_stop(epoch_loss):
                     print(f'Early stopping at epoch {epoch}')
                     return model
 
@@ -199,11 +199,12 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     criterion = nn.CrossEntropyLoss()
     optimizer_conv = optim.Adam(model_conv.parameters(), lr=learning_rate)
     exp_lr_scheduler = None
+    early_stopper = EarlyStopper(patience=10)
 
     ### Train
     model_conv = train_model(model_conv, dataloaders, criterion, optimizer_conv, exp_lr_scheduler,
                             model_path=os.path.join(MODEL_DIR, run_name), 
-                            num_epochs=NUM_EPOCHS, early_stopping=10)
+                            num_epochs=NUM_EPOCHS, early_stopper=early_stopper)
 
     ### end mlflow
     mlflow.end_run()

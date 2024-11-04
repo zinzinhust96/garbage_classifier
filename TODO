@@ -4,4 +4,5 @@
 - add code to save 5 best ckpts (DONE)
 - add MLflow tracking (DONE)
 - hyper-tuning (lr [1e-3, 3e-4, 1e-4], batch_size [32, 64, 128]) (DONE)
+- ModelCheckpointing on val_acc, but EarlyStopping on val_loss (done)
 - optimized model speed
