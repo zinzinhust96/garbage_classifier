@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+import torchvision
 from tqdm import tqdm
 
 ### Define quantized model
@@ -54,3 +56,18 @@ def quantize_model(model_conv, dataloader, backend="fbgemm"):
     ### End of Post-Training Static Quantization ###
 
     return quantized_model
+
+if __name__ == "__main__":
+    MODEL_PATH = "/home/namdng/garbage_classifier/models/lr_1e-3_bs_64_sche-f0.2-p6/ckpt_63_0.9641_.pth"
+    class_names = ["cardboard_paper", "glass", "metal", "others", "plastic"]
+    model_conv = torchvision.models.efficientnet_v2_s()
+    num_ftrs = model_conv.classifier[1].in_features
+    model_conv.classifier = nn.Sequential(
+        nn.Dropout(0.2),
+        nn.Linear(num_ftrs, 128),
+        nn.ReLU(),
+        nn.Dropout(0.2),
+        nn.Linear(128, len(class_names))
+    )
+    model_conv = model_conv.to(device)
+    model_conv.load_state_dict(torch.load(MODEL_PATH, weights_only=True))

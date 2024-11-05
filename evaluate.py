@@ -9,7 +9,7 @@ from torchvision import datasets, transforms
 import numpy as np
 from tqdm import tqdm
 
-from model_quantization import quantize_model
+from quantize_utils import quantize_model
 
 # Setting seed for all random initializations
 SEED = 2
