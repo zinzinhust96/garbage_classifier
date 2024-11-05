@@ -96,5 +96,10 @@ if QUANTIZE_MODEL:
     model_conv = model_conv.to(device)
     quantized_model = quantize_model(model_conv, dataloaders['calibration'], backend="fbgemm")
     evaluate_model(quantized_model, criterion)
+
+    # enable this to save quantized model
+    # model_dir_name, model_base_name = os.path.dirname(MODEL_PATH), os.path.basename(MODEL_PATH)
+    # model_name = model_base_name.replace('.pth', '')
+    # torch.jit.save(torch.jit.script(quantized_model), f"{model_dir_name}/{model_name}_quantized.pt")
 else:
     evaluate_model(model_conv, criterion)
