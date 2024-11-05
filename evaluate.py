@@ -1,18 +1,29 @@
 import os
 import time
+import random
 
 import torch
 import torch.nn as nn
 import torchvision
 from torchvision import datasets, transforms
+import numpy as np
 from tqdm import tqdm
 
-MODEL_PATH = "/home/namdng/garbage_classfier/models/init/ckpt_10_0.9331.pth"
+from model_quantization import quantize_model
+
+# Setting seed for all random initializations
+SEED = 2
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+
+MODEL_PATH = "/home/namdng/garbage_classifier/models/lr_1e-3_bs_64_sche-f0.2-p6/ckpt_63_0.9641_.pth"
 DATA_DIR = 'data_split'
-DATA_SPLITS = ['val', 'test']
+DATA_SPLITS = ['calibration', 'val', 'test']
 
 BATCH_SIZE = 32
 IMAGE_SIZE = 394
+QUANTIZE_MODEL = True
 
 ### Device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -47,12 +58,13 @@ model_conv.classifier = nn.Sequential(
     nn.Linear(128, len(class_names))
 )
 model_conv = model_conv.to(device)
+print("Load model from", MODEL_PATH)
 model_conv.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
-model_conv.eval()
 criterion = nn.CrossEntropyLoss()
 
 ### Evaluate
 def evaluate_model(model, criterion):
+    model.eval()
     since = time.time()
     for phase in DATA_SPLITS:
         model_conv.eval()
@@ -79,4 +91,10 @@ def evaluate_model(model, criterion):
     time_elapsed = time.time() - since
     print(f"Eval complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s")
 
-evaluate_model(model_conv, criterion)
+if QUANTIZE_MODEL:
+    device = "cpu"
+    model_conv = model_conv.to(device)
+    quantized_model = quantize_model(model_conv, dataloaders['calibration'], backend="fbgemm")
+    evaluate_model(quantized_model, criterion)
+else:
+    evaluate_model(model_conv, criterion)
