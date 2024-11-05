@@ -3,26 +3,36 @@ import torch.nn as nn
 import torchvision
 from tqdm import tqdm
 
-### Define quantized model
-class QuantizedModel(torch.nn.Module):
-    def __init__(self, model):
-        super().__init__()
-        self.model_features = model.features
-        self.model_avgpool = model.avgpool
-        self.model_classifier = model.classifier
-        self.quant = torch.quantization.QuantStub()
-        self.dequant = torch.quantization.DeQuantStub()
-        
+from torch.ao.quantization import QuantStub, DeQuantStub
+
+class QuantizedEfficientNet(nn.Module):
+    def __init__(self, original_model):
+        super(QuantizedEfficientNet, self).__init__()
+        # Copy the original EfficientNet components
+        self.features = original_model.features
+        self.avgpool = original_model.avgpool
+        self.classifier = original_model.classifier
+
+        # Add QuantStub and DeQuantStub
+        self.quant = QuantStub()
+        self.dequant = DeQuantStub()
+
+        # Modify the features module to include quant and dequant stubs
+        self.features = nn.Sequential(
+            self.quant,  # Insert QuantStub at the beginning
+            *self.features,
+            self.dequant  # Insert DeQuantStub at the end
+        )
+
     def forward(self, x):
-        x = self.quant(x)
-        x = self.model_features(x)
-        x = self.dequant(x)
-        x = self.model_avgpool(x)
+        x = self.features(x)
+        x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.model_classifier(x)
+        x = self.classifier(x)
         return x
-    
-def quantize_model(model_conv, dataloader, backend="fbgemm"):
+
+
+def static_quantize_model(model_conv, dataloader, backend="fbgemm"):
     """ Quantize a model using PyTorch's post-training static quantization.
 
     Args:
@@ -30,14 +40,14 @@ def quantize_model(model_conv, dataloader, backend="fbgemm"):
         dataloader (torch.utils.data.DataLoader): The dataloader for calibration.
         backend (str): Pytorch backend for quantization. Can be one of fbgemm' for server, 'qnnpack' for mobile. Default is 'fbgemm'.
     """
-    quantized_model = QuantizedModel(model_conv)
-
+    quantized_model = QuantizedEfficientNet(model_conv)
+        
     ### Post-Training Static Quantization ###
-    model_conv.qconfig = torch.quantization.get_default_qconfig(backend)
+    quantized_model.qconfig = torch.ao.quantization.get_default_qconfig(backend)
     # Set the backend on which the quantized kernels need to be run
     torch.backends.quantized.engine=backend
 
-    torch.quantization.prepare(quantized_model, inplace=True)
+    torch.ao.quantization.prepare(quantized_model, inplace=True)
 
     # Calibration
     def calibrate(model, sample_loader):
@@ -52,22 +62,10 @@ def quantize_model(model_conv, dataloader, backend="fbgemm"):
     calibrate(quantized_model, dataloader)
 
     # Convert to quantized model
-    torch.quantization.convert(quantized_model, inplace=True)
+    torch.ao.quantization.convert(quantized_model, inplace=True)
     ### End of Post-Training Static Quantization ###
 
     return quantized_model
 
-if __name__ == "__main__":
-    MODEL_PATH = "/home/namdng/garbage_classifier/models/lr_1e-3_bs_64_sche-f0.2-p6/ckpt_63_0.9641_.pth"
-    class_names = ["cardboard_paper", "glass", "metal", "others", "plastic"]
-    model_conv = torchvision.models.efficientnet_v2_s()
-    num_ftrs = model_conv.classifier[1].in_features
-    model_conv.classifier = nn.Sequential(
-        nn.Dropout(0.2),
-        nn.Linear(num_ftrs, 128),
-        nn.ReLU(),
-        nn.Dropout(0.2),
-        nn.Linear(128, len(class_names))
-    )
-    model_conv = model_conv.to(device)
-    model_conv.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
+def dynamic_quantize_model(model_conv):
+    raise NotImplementedError("Dynamic quantization is not supported yet.")

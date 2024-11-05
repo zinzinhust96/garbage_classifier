@@ -9,7 +9,7 @@ from torchvision import datasets, transforms
 import numpy as np
 from tqdm import tqdm
 
-from quantize_utils import quantize_model
+from quantize_utils import static_quantize_model
 
 # Setting seed for all random initializations
 SEED = 2
@@ -94,7 +94,7 @@ def evaluate_model(model, criterion):
 if QUANTIZE_MODEL:
     device = "cpu"
     model_conv = model_conv.to(device)
-    quantized_model = quantize_model(model_conv, dataloaders['calibration'], backend="fbgemm")
+    quantized_model = static_quantize_model(model_conv, dataloaders['calibration'], backend="fbgemm")
     evaluate_model(quantized_model, criterion)
 
     # enable this to save quantized model
