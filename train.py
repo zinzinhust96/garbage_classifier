@@ -28,10 +28,14 @@ MODEL_DIR = 'models/'
 DATA_DIR = 'data_split'
 
 ### hyperparameters
-IMAGE_SIZE = 394
-NUM_EPOCHS = 100
+BACKBONE = 'resnet50'
+IMAGE_SIZE = 224 if BACKBONE == 'resnet50' else 394
+NUM_EPOCHS = 20
 NUM_IMMEDIATE_FEATURES = 128
 DROPOUT_RATE = 0.2
+
+### Device
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 ### init mlflow tracking
 mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI'))
@@ -60,8 +64,6 @@ image_datasets = {x: datasets.ImageFolder(os.path.join(DATA_DIR, x),
                   for x in ['train', 'val']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def keep_k_best_checkpoints_by_score(model_dir, checkpoint_save_total_limit):
@@ -162,6 +164,51 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     os.makedirs(os.path.join(MODEL_DIR, run_name), exist_ok=True)
     print(f"\n\n ++++++++++ Training with exp name: {run_name}")
 
+    ### Dataloader for the current batch size
+    dataloaders = {
+        x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
+                                        shuffle=True, num_workers=8)
+        for x in ['train', 'val']
+    }
+
+    ### Init models
+    def setup_classifier_head(num_ftrs, len_class_names):
+        return nn.Sequential(
+            nn.Dropout(DROPOUT_RATE),
+            nn.Linear(num_ftrs, NUM_IMMEDIATE_FEATURES),
+            nn.ReLU(),
+            nn.Dropout(DROPOUT_RATE),
+            nn.Linear(NUM_IMMEDIATE_FEATURES, len_class_names)
+        )
+
+    if BACKBONE == "efficientnet_v2s":
+        model_conv = torchvision.models.efficientnet_v2_s(weights='IMAGENET1K_V1')
+        for param in model_conv.parameters():
+            param.requires_grad = False
+        num_ftrs = model_conv.classifier[1].in_features
+        model_conv.classifier = setup_classifier_head(num_ftrs, len(class_names))
+    elif BACKBONE == "resnet50":
+        model_conv = torchvision.models.resnet50(weights='IMAGENET1K_V1')
+        for param in model_conv.parameters():
+            param.requires_grad = False
+        num_ftrs = model_conv.fc.in_features
+        model_conv.fc = setup_classifier_head(num_ftrs, len(class_names))
+        
+    model_conv = model_conv.to(device)
+
+    ### Loss and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer_conv = optim.Adam(model_conv.parameters(), lr=learning_rate)
+
+    ### Learning rate scheduler based on validation loss
+    # exp_lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_conv, mode='min', factor=0.2, patience=6)
+    exp_lr_scheduler = None
+
+    ### early stopping based on validation loss
+    # early_stopper = EarlyStopper(patience=10)
+    early_stopper = None
+
+    ### start to train ###
     ### mlflow
     mlflow.start_run(run_name=run_name)
 
@@ -176,37 +223,6 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     }
     mlflow.log_params(hyperparameters)
 
-    ### Dataloader for the current batch size
-    dataloaders = {
-        x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
-                                        shuffle=True, num_workers=8)
-        for x in ['train', 'val']
-    }
-
-    ### Init models
-    model_conv = torchvision.models.efficientnet_v2_s(weights='IMAGENET1K_V1')
-
-    # freeze all layers
-    for param in model_conv.parameters():
-        param.requires_grad = False
-
-    num_ftrs = model_conv.classifier[1].in_features
-    model_conv.classifier = nn.Sequential(
-        nn.Dropout(DROPOUT_RATE),
-        nn.Linear(num_ftrs, NUM_IMMEDIATE_FEATURES),
-        nn.ReLU(),
-        nn.Dropout(DROPOUT_RATE),
-        nn.Linear(NUM_IMMEDIATE_FEATURES, len(class_names))
-    )
-    model_conv = model_conv.to(device)
-
-    ### Loss and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer_conv = optim.Adam(model_conv.parameters(), lr=learning_rate)
-    exp_lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_conv, mode='min', factor=0.2, patience=6)
-    # exp_lr_scheduler = None
-    early_stopper = EarlyStopper(patience=10)
-
     ### Train
     model_conv = train_model(model_conv, dataloaders, criterion, optimizer_conv, exp_lr_scheduler,
                             model_path=os.path.join(MODEL_DIR, run_name), 
@@ -217,16 +233,16 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 
 
 ### Hyperparameter tuning
-# learning_rates = [1e-3, 3e-4, 1e-4]
-# batch_sizes = [32, 64, 128]
+learning_rates = [3e-3, 1e-3, 3e-4]
+batch_sizes = [16, 32, 64, 128]
 
-# for lr in learning_rates:
-#     for bs in batch_sizes:
-#         run_name = f"param_tuning_lr_{lr}_bs_{bs}"
-#         run_an_experiment(lr, bs, run_name)
+for lr in learning_rates:
+    for bs in batch_sizes:
+        run_name = f"resnet50_param_tuning_lr_{lr}_bs_{bs}"
+        run_an_experiment(lr, bs, run_name)
 
 ### Normal run
-LEARNING_RATE = 1e-3
-BATCH_SIZE = 64
-RUN_NAME = "lr_1e-3_bs_64_sche-f0.2-p6"
-run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
+# LEARNING_RATE = 1e-3
+# BATCH_SIZE = 32
+# RUN_NAME = "resnet50_lr_1e-3_bs_32_imsize224"
+# run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
