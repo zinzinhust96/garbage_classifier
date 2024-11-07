@@ -180,8 +180,8 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     exp_lr_scheduler = None
 
     ### early stopping based on validation loss
-    # early_stopper = EarlyStopper(patience=10)
-    early_stopper = None
+    early_stopper = EarlyStopper(patience=10)
+    # early_stopper = None
 
     ### start to train ###
     ### mlflow
@@ -209,16 +209,16 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 
 
 ### Hyperparameter tuning
-learning_rates = [3e-3, 1e-3, 3e-4]
-batch_sizes = [16, 32, 64, 128]
+# learning_rates = [3e-3, 1e-3, 3e-4]
+# batch_sizes = [16, 32, 64, 128]
 
-for lr in learning_rates:
-    for bs in batch_sizes:
-        run_name = f"resnet50_param_tuning_lr_{lr}_bs_{bs}"
-        run_an_experiment(lr, bs, run_name)
+# for lr in learning_rates:
+#     for bs in batch_sizes:
+#         run_name = f"resnet50_param_tuning_lr_{lr}_bs_{bs}"
+#         run_an_experiment(lr, bs, run_name)
 
 ### Normal run
-# LEARNING_RATE = 1e-3
-# BATCH_SIZE = 32
-# RUN_NAME = "resnet50_lr_1e-3_bs_32_imsize224"
-# run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
+LEARNING_RATE = 1e-3
+BATCH_SIZE = 64
+RUN_NAME = "resnet50_tuned_lr_1e-3_bs_64"
+run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)

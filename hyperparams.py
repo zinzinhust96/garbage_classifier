@@ -1,6 +1,6 @@
 ### hyperparameters
 BACKBONE = 'resnet50'
 IMAGE_SIZE = 224 if BACKBONE == 'resnet50' else 394
-NUM_EPOCHS = 20
+NUM_EPOCHS = 100
 NUM_IMMEDIATE_FEATURES = 128
 DROPOUT_RATE = 0.2
