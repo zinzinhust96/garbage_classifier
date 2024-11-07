@@ -12,7 +12,10 @@ import torchvision
 from torchvision import datasets, transforms
 from dotenv import load_dotenv
 
+import hyperparams as hparams
 from early_stop import EarlyStopper
+from model import load_model
+
 
 load_dotenv()
 
@@ -27,13 +30,6 @@ EXPERIMENT_NAME = "GC"
 MODEL_DIR = 'models/'
 DATA_DIR = 'data_split'
 
-### hyperparameters
-BACKBONE = 'resnet50'
-IMAGE_SIZE = 224 if BACKBONE == 'resnet50' else 394
-NUM_EPOCHS = 20
-NUM_IMMEDIATE_FEATURES = 128
-DROPOUT_RATE = 0.2
-
 ### Device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -44,7 +40,7 @@ mlflow.set_experiment(EXPERIMENT_NAME)
 ### Data transforms
 data_transforms = {
     'train': transforms.Compose([
-        transforms.RandomResizedCrop((IMAGE_SIZE, IMAGE_SIZE), scale=(0.8, 1.0)),
+        transforms.RandomResizedCrop((hparams.IMAGE_SIZE, hparams.IMAGE_SIZE), scale=(0.8, 1.0)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         # transforms.RandomRotation(30),
@@ -52,7 +48,7 @@ data_transforms = {
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'val': transforms.Compose([
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.Resize((hparams.IMAGE_SIZE, hparams.IMAGE_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
@@ -172,28 +168,7 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     }
 
     ### Init models
-    def setup_classifier_head(num_ftrs, len_class_names):
-        return nn.Sequential(
-            nn.Dropout(DROPOUT_RATE),
-            nn.Linear(num_ftrs, NUM_IMMEDIATE_FEATURES),
-            nn.ReLU(),
-            nn.Dropout(DROPOUT_RATE),
-            nn.Linear(NUM_IMMEDIATE_FEATURES, len_class_names)
-        )
-
-    if BACKBONE == "efficientnet_v2s":
-        model_conv = torchvision.models.efficientnet_v2_s(weights='IMAGENET1K_V1')
-        for param in model_conv.parameters():
-            param.requires_grad = False
-        num_ftrs = model_conv.classifier[1].in_features
-        model_conv.classifier = setup_classifier_head(num_ftrs, len(class_names))
-    elif BACKBONE == "resnet50":
-        model_conv = torchvision.models.resnet50(weights='IMAGENET1K_V1')
-        for param in model_conv.parameters():
-            param.requires_grad = False
-        num_ftrs = model_conv.fc.in_features
-        model_conv.fc = setup_classifier_head(num_ftrs, len(class_names))
-        
+    model_conv = load_model(hparams.BACKBONE, hparams.NUM_IMMEDIATE_FEATURES, len(class_names), hparams.DROPOUT_RATE)    
     model_conv = model_conv.to(device)
 
     ### Loss and optimizer
@@ -214,19 +189,20 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 
     ### log hyperparameters
     hyperparameters = {
+        'backbone': hparams.BACKBONE,
         'batch_size': batch_size,
-        'image_size': IMAGE_SIZE,
+        'image_size': hparams.IMAGE_SIZE,
         'learning_rate': learning_rate,
-        'num_epochs': NUM_EPOCHS,
-        'num_immediate_features': NUM_IMMEDIATE_FEATURES,
-        'dropout_rate': DROPOUT_RATE
+        'num_epochs': hparams.NUM_EPOCHS,
+        'num_immediate_features': hparams.NUM_IMMEDIATE_FEATURES,
+        'dropout_rate': hparams.DROPOUT_RATE
     }
     mlflow.log_params(hyperparameters)
 
     ### Train
     model_conv = train_model(model_conv, dataloaders, criterion, optimizer_conv, exp_lr_scheduler,
                             model_path=os.path.join(MODEL_DIR, run_name), 
-                            num_epochs=NUM_EPOCHS, early_stopper=early_stopper)
+                            num_epochs=hparams.NUM_EPOCHS, early_stopper=early_stopper)
 
     ### end mlflow
     mlflow.end_run()
