@@ -176,8 +176,8 @@ def run_an_experiment(learning_rate, batch_size, run_name):
     optimizer_conv = optim.Adam(model_conv.parameters(), lr=learning_rate)
 
     ### Learning rate scheduler based on validation loss
-    # exp_lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_conv, mode='min', factor=0.2, patience=6)
-    exp_lr_scheduler = None
+    exp_lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_conv, mode='min', factor=0.2, patience=6)
+    # exp_lr_scheduler = None
 
     ### early stopping based on validation loss
     early_stopper = EarlyStopper(patience=10)
@@ -220,5 +220,5 @@ def run_an_experiment(learning_rate, batch_size, run_name):
 ### Normal run
 LEARNING_RATE = 1e-3
 BATCH_SIZE = 64
-RUN_NAME = "resnet50_tuned_lr_1e-3_bs_64"
+RUN_NAME = "resnet50_tuned_lr_1e-3_bs_64_sche-f0.2-p6"
 run_an_experiment(LEARNING_RATE, BATCH_SIZE, RUN_NAME)
