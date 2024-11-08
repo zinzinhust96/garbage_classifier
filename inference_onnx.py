@@ -9,12 +9,15 @@ from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
 
+from quantize_utils import static_quantize_model
+import hyperparams as hparams
+from model import load_model
+
 # set num threads to 1 (NOTE: disable this when on Raspberry Pi)
 sess_opt = rt.SessionOptions()
 sess_opt.intra_op_num_threads = 1
 
-MODEL_PATH = "/home/namdng/garbage_classifier/models/init/gc_opset20.onnx"
-IMAGE_SIZE = 394
+MODEL_PATH = "/home/namdng/garbage_classifier/models/resnet50_tuned_lr_1e-3_bs_64_sche-f0.2-p6/gc_torchscript.onnx"
 BENCHMARK = True
 
 ### Device
@@ -24,7 +27,7 @@ device = "cpu"
 ### Data transforms
 data_transforms = {
     'test': transforms.Compose([
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.Resize((hparams.IMAGE_SIZE, hparams.IMAGE_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -79,7 +82,12 @@ else:
     print(f"Inference time: {time_elapsed}")
 
 # Latency for CPU (i5-12500, 1 CPU core):
+# efficientnet_v2s:
 #   0.2265708318320654 (torch model)
 #   0.17627952814102174 (onnx opset 10)
 #   0.1762681257724762 (onnx opset 20)
 
+# resnet50:
+#   0.08464848399162292 (torch model)
+#   0.043368810415267946 (quantized torch model)
+#   0.0657833194732666 (onnx opset 10)

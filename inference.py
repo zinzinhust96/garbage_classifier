@@ -8,19 +8,23 @@ from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
 
-MODEL_PATH = "/home/namdng/garbage_classfier/models/init/ckpt_26_0.9547.pth"
-IMAGE_SIZE = 394
+from quantize_utils import static_quantize_model
+import hyperparams as hparams
+from model import load_model
+
+MODEL_PATH = "/home/namdng/garbage_classifier/models/resnet50_tuned_lr_1e-3_bs_64_sche-f0.2-p6/quantized_ckpt_57_0.9597.pth"
 BENCHMARK = True
 
-# torch.set_num_threads(1)
+torch.set_num_threads(1)
 
 ### Device
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 ### Data transforms
 data_transforms = {
     'test': transforms.Compose([
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.Resize((hparams.IMAGE_SIZE, hparams.IMAGE_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -28,18 +32,14 @@ data_transforms = {
 
 ### Load model
 class_names = ["cardboard_paper", "glass", "metal", "others", "plastic"]
-model_conv = torchvision.models.efficientnet_v2_s()
-num_ftrs = model_conv.classifier[1].in_features
-model_conv.classifier = nn.Sequential(
-    nn.Dropout(0.2),
-    nn.Linear(num_ftrs, 128),
-    nn.ReLU(),
-    nn.Dropout(0.2),
-    nn.Linear(128, len(class_names))
-)
-model_conv = model_conv.to(device)
+model_conv = load_model(hparams.BACKBONE, hparams.NUM_IMMEDIATE_FEATURES, len(class_names), hparams.DROPOUT_RATE)
+if "quantize" in MODEL_PATH:
+    device = "cpu"
+    model_conv = static_quantize_model(model_conv, dataloader=None, backend="fbgemm")
+
+print("Loading model: ", MODEL_PATH)
 model_conv.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
-model_conv.eval()
+model_conv = model_conv.to(device)
 
 ### Inference
 def visualize_model_predictions(model,img_path):
@@ -65,6 +65,7 @@ for class_name in os.listdir(TEST_DIR):
     for img_name in os.listdir(class_dir):
         img_path = os.path.join(class_dir, img_name)
         test_images_paths.append(img_path)
+test_images_paths = test_images_paths[:200]
 print(f"Total test images: {len(test_images_paths)}")
 
 if BENCHMARK:
