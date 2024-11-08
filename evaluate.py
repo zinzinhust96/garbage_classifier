@@ -19,7 +19,7 @@ random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
-MODEL_PATH = "/home/namdng/garbage_classifier/models/resnet50_tuned_lr_1e-3_bs_64_sche-f0.2-p6/ckpt_57_0.9597.pth"
+MODEL_PATH = "/home/namdng/garbage_classifier/models/resnet50_tuned_lr_1e-3_bs_64_sche-f0.2-p6/quantized_ckpt_57_0.9597.pth"
 DATA_DIR = 'data_split'
 DATA_SPLITS = ['calibration', 'val', 'test']
 
@@ -50,6 +50,10 @@ class_names = image_datasets[DATA_SPLITS[0]].classes
 ### Load model
 print("Loading model: ", MODEL_PATH)
 model_conv = load_model(hparams.BACKBONE, hparams.NUM_IMMEDIATE_FEATURES, len(class_names), hparams.DROPOUT_RATE)
+if "quantize" in MODEL_PATH:
+    device = "cpu"
+    model_conv = static_quantize_model(model_conv, dataloader=None, backend="fbgemm")
+
 model_conv.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
 model_conv = model_conv.to(device)
 criterion = nn.CrossEntropyLoss()
