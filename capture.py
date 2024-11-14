@@ -42,9 +42,9 @@ def classify_image(ort_session, img):
 
 ### Camera
 cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-FRAME_WIDTH = 320
+FRAME_WIDTH = 640
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-FRAME_HEIGHT = 240
+FRAME_HEIGHT = 480
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
