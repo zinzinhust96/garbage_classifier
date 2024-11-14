@@ -5,3 +5,5 @@ __pycache__/
 models/
 data_split/
 input/
+
+*.jpg
