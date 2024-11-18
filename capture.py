@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime
 
 import cv2
 import torch
@@ -9,8 +10,10 @@ from torchvision import transforms
 
 import hyperparams as hparams
 
-MODEL_PATH = "/home/namdng/Documents/linhtinh/garbage_classifier/models/resnet50_tuned_lr_1e-3_bs_64_sche-f0.2-p6/gc_torchscript.onnx"
+OUTPUT_PATH = "./output"
 class_names = ["cardboard_paper", "glass", "metal", "others", "plastic"]
+for i, name in enumerate(class_names):
+    os.makedirs(os.path.join(OUTPUT_PATH, name), exist_ok=True)
 device = "cpu"
 
 # Set up the ONNX session with options
@@ -93,6 +96,10 @@ while True:
         # Show the captured frame with prediction
         cv2.putText(frame, f"{pred_class}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         cv2.imshow("Captured Image", frame)
+
+        # save the image to the corresponding folder based on the prediction
+        output_path = os.path.join(OUTPUT_PATH, pred_class, f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
+        img.save(output_path)
 
     # Exit if 'q' is pressed
     elif key == ord('q'):
